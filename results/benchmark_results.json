@@ -30,29 +30,29 @@
     },
     "WFQ": {
       "overall": {
-        "avg_delay_ms": 94.189,
-        "p95_delay_ms": 382.62,
-        "jitter_ms": 127.326,
-        "loss_rate_pct": 31.99,
-        "total_throughput_mbps": 3.784,
-        "jains_fairness_index": 0.6748
+        "avg_delay_ms": 94.015,
+        "p95_delay_ms": 381.996,
+        "jitter_ms": 126.528,
+        "loss_rate_pct": 32.11,
+        "total_throughput_mbps": 3.777,
+        "jains_fairness_index": 0.6752
       },
       "voice_class": {
-        "avg_delay_ms": 4.054,
+        "avg_delay_ms": 4.024,
         "loss_rate_pct": 0.1
       }
     },
     "DQN": {
       "overall": {
-        "avg_delay_ms": 92.971,
-        "p95_delay_ms": 300.004,
-        "jitter_ms": 62.69,
-        "loss_rate_pct": 31.49,
-        "total_throughput_mbps": 3.847,
-        "jains_fairness_index": 0.703
+        "avg_delay_ms": 33.389,
+        "p95_delay_ms": 133.577,
+        "jitter_ms": 25.171,
+        "loss_rate_pct": 34.27,
+        "total_throughput_mbps": 3.654,
+        "jains_fairness_index": 0.4678
       },
       "voice_class": {
-        "avg_delay_ms": 7.595,
+        "avg_delay_ms": 0.642,
         "loss_rate_pct": 0.0
       }
     }
@@ -88,29 +88,29 @@
     },
     "WFQ": {
       "overall": {
-        "avg_delay_ms": 99.575,
-        "p95_delay_ms": 412.719,
-        "jitter_ms": 136.73,
-        "loss_rate_pct": 59.88,
-        "total_throughput_mbps": 3.434,
-        "jains_fairness_index": 0.7153
+        "avg_delay_ms": 99.58,
+        "p95_delay_ms": 407.507,
+        "jitter_ms": 135.839,
+        "loss_rate_pct": 59.82,
+        "total_throughput_mbps": 3.416,
+        "jains_fairness_index": 0.7191
       },
       "voice_class": {
-        "avg_delay_ms": 18.962,
-        "loss_rate_pct": 13.24
+        "avg_delay_ms": 19.405,
+        "loss_rate_pct": 12.98
       }
     },
     "DQN": {
       "overall": {
-        "avg_delay_ms": 90.684,
-        "p95_delay_ms": 306.461,
-        "jitter_ms": 84.746,
-        "loss_rate_pct": 58.54,
-        "total_throughput_mbps": 3.385,
-        "jains_fairness_index": 0.8002
+        "avg_delay_ms": 47.276,
+        "p95_delay_ms": 98.557,
+        "jitter_ms": 40.147,
+        "loss_rate_pct": 59.18,
+        "total_throughput_mbps": 3.031,
+        "jains_fairness_index": 0.465
       },
       "voice_class": {
-        "avg_delay_ms": 7.522,
+        "avg_delay_ms": 5.744,
         "loss_rate_pct": 0.0
       }
     }
@@ -146,29 +146,29 @@
     },
     "WFQ": {
       "overall": {
-        "avg_delay_ms": 31.603,
-        "p95_delay_ms": 136.025,
-        "jitter_ms": 39.159,
+        "avg_delay_ms": 31.733,
+        "p95_delay_ms": 136.388,
+        "jitter_ms": 39.576,
         "loss_rate_pct": 0.72,
-        "total_throughput_mbps": 4.218,
-        "jains_fairness_index": 0.6933
+        "total_throughput_mbps": 4.22,
+        "jains_fairness_index": 0.6934
       },
       "voice_class": {
-        "avg_delay_ms": 1.791,
+        "avg_delay_ms": 1.735,
         "loss_rate_pct": 0.0
       }
     },
     "DQN": {
       "overall": {
-        "avg_delay_ms": 33.981,
-        "p95_delay_ms": 102.282,
-        "jitter_ms": 22.386,
-        "loss_rate_pct": 0.12,
-        "total_throughput_mbps": 4.247,
-        "jains_fairness_index": 0.6891
+        "avg_delay_ms": 31.412,
+        "p95_delay_ms": 114.476,
+        "jitter_ms": 23.331,
+        "loss_rate_pct": 0.84,
+        "total_throughput_mbps": 4.237,
+        "jains_fairness_index": 0.6877
       },
       "voice_class": {
-        "avg_delay_ms": 1.904,
+        "avg_delay_ms": 2.092,
         "loss_rate_pct": 0.0
       }
     }

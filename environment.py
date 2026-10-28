@@ -140,6 +140,14 @@ class PacketSchedulerEnv(gym.Env):
         obs = np.array([f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12], dtype=np.float32)
         return np.clip(obs, 0.0, 10.0)
 
+    def get_action_mask(self) -> np.ndarray:
+        """Returns boolean mask where True indicates a queue has packets waiting."""
+        q_len = self.queue_sys.get_queue_lengths()
+        mask = np.array([q_len[0] > 0, q_len[1] > 0, q_len[2] > 0], dtype=bool)
+        if not np.any(mask):
+            return np.ones(3, dtype=bool)
+        return mask
+
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
         self.current_step += 1
         start_time = self.current_time_ms

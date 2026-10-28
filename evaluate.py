@@ -80,7 +80,12 @@ def run_single_simulation(
                     near_dead[0] / 50.0, near_dead[1] / 50.0, near_dead[2] / 50.0
                 ], dtype=np.float32)
                 
-                action = dqn_agent.select_action(obs, eval_mode=True)
+                mask = np.array([
+                    len(queue_sys.queues[0]) > 0,
+                    len(queue_sys.queues[1]) > 0,
+                    len(queue_sys.queues[2]) > 0
+                ], dtype=bool)
+                action = dqn_agent.select_action(obs, eval_mode=True, action_mask=mask)
                 
                 # Handle empty target queue gracefully: fall back to most urgent queue
                 if len(queue_sys.queues[action]) > 0:

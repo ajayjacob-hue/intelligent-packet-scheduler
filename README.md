@@ -105,6 +105,11 @@ streamlit run dashboard.py
 
 ## 🧠 DRL Model Specifications
 
+- **Architecture**: **Double Dueling Deep Q-Network (Double Dueling DQN)**
+  - Decoupled State-Value $V(s)$ and Advantage $A(s, a)$ streams: $Q(s, a) = V(s) + (A(s, a) - \frac{1}{|A|}\sum A(s, a'))$
+  - Double Q-learning target formulation to eliminate overestimation bias
+  - Polyak soft target network synchronization ($\tau = 0.005$)
+  - Invalid action masking preventing empty queue exploration
 - **State Vector ($S_t \in \mathbb{R}^{13}$)**: Queue occupancies, head-of-line waiting times, moving average delays, bottleneck link status, and near-deadline packet ratios.
 - **Action Space ($A_t \in \{0, 1, 2\}$)**: Dispatch Voice (0), Video (1), or Bulk (2).
 - **Reward Function**:
@@ -115,3 +120,4 @@ streamlit run dashboard.py
 
 ## 📜 License
 Distributed under the MIT License. See `LICENSE` for more information.
+

@@ -478,7 +478,12 @@ def main():
                         1.0 if queue_sys.is_link_busy(curr_t) else 0.0,
                         near_dead[0] / queue_cap, near_dead[1] / queue_cap, near_dead[2] / queue_cap
                     ], dtype=np.float32)
-                    act = dqn_agent.select_action(obs, eval_mode=True)
+                    mask = np.array([
+                        len(queue_sys.queues[0]) > 0,
+                        len(queue_sys.queues[1]) > 0,
+                        len(queue_sys.queues[2]) > 0
+                    ], dtype=bool)
+                    act = dqn_agent.select_action(obs, eval_mode=True, action_mask=mask)
                     sel_q = act if len(queue_sys.queues[act]) > 0 else (0 if len(queue_sys.queues[0])>0 else (1 if len(queue_sys.queues[1])>0 else 2))
                     
                 if sel_q is not None and len(queue_sys.queues[sel_q]) > 0:

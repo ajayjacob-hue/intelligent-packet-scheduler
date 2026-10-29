@@ -76,13 +76,13 @@ class PacketSchedulerEnv(gym.Env):
         self.link_busy_steps = 0
         
         # Multi-objective balanced QoS reward weighting
-        self.alpha = 1.0     # Delivered service & SLA compliance coefficient
-        self.beta = 1.0      # Delay / SLA violation penalty coefficient
-        self.gamma = 2.5     # Loss penalty coefficient (overflow + purge)
+        self.alpha = 1.2     # Delivered service & SLA compliance coefficient
+        self.beta = 0.8      # Delay / SLA violation penalty coefficient
+        self.gamma = 2.0     # Loss penalty coefficient (overflow + purge)
         self.delta = 0.2     # Jitter penalty coefficient
-        self.lambda_u = 0.8  # Starvation prevention penalty coefficient
-        self.lambda_p = 0.5  # Buffer congestion pressure penalty coefficient
-        self.lambda_f = 0.6  # Fairness bonus coefficient
+        self.lambda_u = 1.6  # Starvation prevention penalty coefficient
+        self.lambda_p = 2.2  # Buffer congestion pressure penalty coefficient
+        self.lambda_f = 2.0  # Fairness bonus coefficient
 
     def reset(self, seed: Optional[int] = None, options: Optional[Dict[str, Any]] = None) -> Tuple[np.ndarray, Dict[str, Any]]:
         super().reset(seed=seed)
@@ -230,29 +230,37 @@ class PacketSchedulerEnv(gym.Env):
         # 5. Proactive Starvation Penalty across all queues
         oldest = self.queue_sys.get_oldest_waiting_time(start_time)
         starvation_penalty = 0.0
-        if oldest[0] > 18.0:
-            starvation_penalty += ((oldest[0] - 18.0) / 12.0) ** 1.5
-        if oldest[1] > 60.0:
-            starvation_penalty += ((oldest[1] - 60.0) / 40.0) ** 1.5
-        if oldest[2] > 120.0:
-            starvation_penalty += ((oldest[2] - 120.0) / 100.0) ** 1.5
+        if oldest[0] > 15.0:
+            starvation_penalty += ((oldest[0] - 15.0) / 10.0) ** 1.5
+        if oldest[1] > 40.0:
+            starvation_penalty += ((oldest[1] - 40.0) / 30.0) ** 1.5
+        if oldest[2] > 40.0:
+            starvation_penalty += ((oldest[2] - 40.0) / 35.0) ** 1.5
 
         # 6. Proactive Buffer Congestion Pressure (prevent overflow before it happens)
         buffer_pressure_penalty = 0.0
         q_lens = self.queue_sys.get_queue_lengths()
         for q_i in [0, 1, 2]:
             ratio = q_lens[q_i] / self.queue_capacities[q_i]
-            if ratio > 0.6:
-                buffer_pressure_penalty += ((ratio - 0.6) / 0.4) ** 2.0
+            if ratio > 0.45:
+                buffer_pressure_penalty += ((ratio - 0.45) / 0.55) ** 1.8
 
         # 7. Live Jain's Fairness Incentive across recent serviced packets
-        if len(self.recent_served_classes) >= 10:
+        if len(self.recent_served_classes) >= 6:
             counts = [self.recent_served_classes.count(c) for c in [0, 1, 2]]
             sum_c = sum(counts)
             sum_sq = sum(c * c for c in counts)
             if sum_sq > 0:
                 jains_idx = (sum_c ** 2) / (3.0 * sum_sq)
                 fairness_bonus = jains_idx
+
+        # 8. Cooperative Interleaving Bonus: reward serving Video/Bulk when Voice is safe
+        cooperative_bonus = 0.0
+        if served_pkt and served_pkt.traffic_type in [1, 2]:
+            voice_wait = oldest[0]
+            voice_len = q_lens[0]
+            if voice_len <= 3 and voice_wait < 14.0:
+                cooperative_bonus = 1.0
         
         # Total composite reward equation
         step_reward = (
@@ -263,6 +271,7 @@ class PacketSchedulerEnv(gym.Env):
             - self.lambda_u * starvation_penalty
             - self.lambda_p * buffer_pressure_penalty
             + self.lambda_f * fairness_bonus
+            + cooperative_bonus
             - invalid_action_penalty
         )
         

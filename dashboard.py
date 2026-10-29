@@ -92,7 +92,7 @@ def main():
         "Bottleneck Link Bandwidth (Mbps)",
         min_value=1.0,
         max_value=20.0,
-        value=6.0 if scenario != "congested" else 3.5,
+        value=6.0 if scenario != "congested" else 5.0,
         step=0.5
     )
     
@@ -100,7 +100,7 @@ def main():
         "Traffic Intensity Multiplier",
         min_value=0.5,
         max_value=3.0,
-        value=1.0 if scenario == "normal" else 1.8,
+        value=1.0,
         step=0.1
     )
     
@@ -348,174 +348,48 @@ def main():
             with col_pareto:
                 st.markdown("#### 🎯 2D Pareto Optimal Trade-Off Frontier")
                 
-                pareto_view = st.selectbox(
-                    "Pareto Trade-Off Axis",
-                    [
-                        "🏆 Voice SLA Survival vs Total Delivery Rate % (Critical Congestion Protection)",
-                        "📉 Tail Latency (P95) vs Total Delivery Rate %",
-                        "🎯 Voice Delay vs Delivery-Ratio Fairness Index",
-                        "⚖️ Voice Delay vs Raw Throughput Fairness"
-                    ],
-                    index=0,
-                    label_visibility="collapsed"
-                )
-                
                 pareto_rows = []
                 for sch, data in sim_results.items():
                     ov = data["overall"]
                     vc = data["per_class"]["Voice"]
-                    tot_deliv_pct = max(0.0, 100.0 - ov["loss_rate_pct"])
-                    deliv_fairness = ov.get("jains_fairness_delivery_ratio", ov["jains_fairness_index"])
                     pareto_rows.append({
                         "Scheduler": sch,
                         "DisplayLabel": f"⭐ {sch}" if sch == "DQN" else sch,
                         "Voice Delay (ms)": vc["avg_delay_ms"],
                         "Voice Loss (%)": vc["loss_rate_pct"],
-                        "Voice SLA Survival (%)": max(0.0, 100.0 - vc["loss_rate_pct"]),
-                        "P95 Tail Delay (ms)": ov["p95_delay_ms"],
-                        "Total Delivery Rate (%)": tot_deliv_pct,
-                        "Delivery Fairness": deliv_fairness,
-                        "Throughput Fairness": ov["jains_fairness_index"],
+                        "Jain's Fairness Index": ov["jains_fairness_index"],
                         "Throughput (Mbps)": ov["total_throughput_mbps"]
                     })
                 df_pareto = pd.DataFrame(pareto_rows)
                 
-                if "Voice SLA Survival" in pareto_view:
-                    x_col = "Voice Loss (%)"
-                    y_col = "Total Delivery Rate (%)"
-                    x_label = "Voice Packet Loss Rate (%) ← (0% is Ideal)"
-                    y_label = "Total Delivery Success Rate (%) ↑ (Higher is Better)"
-                    
-                    min_y = max(0.0, df_pareto[y_col].min() * 0.75)
-                    max_y = min(103.0, max(df_pareto[y_col].max() * 1.18, 15.0))
-                    max_x = max(100.0, df_pareto[x_col].max() * 1.05)
-                    best_deliv = df_pareto[y_col].max()
-                    
-                    fig_pareto = px.scatter(
-                        df_pareto,
-                        x=x_col,
-                        y=y_col,
-                        text="DisplayLabel",
-                        size="Throughput (Mbps)",
-                        color="Scheduler",
-                        template="plotly_dark",
-                        color_discrete_map={"DQN": "#10b981", "PQ": "#f59e0b", "WFQ": "#6366f1", "FIFO": "#94a3b8"}
-                    )
-                    # Sweet spot: Voice Loss < 5%, Delivery Rate in top 10%
-                    fig_pareto.add_shape(
-                        type="rect",
-                        x0=-1.0, y0=best_deliv * 0.88, x1=8.0, y1=max_y,
-                        fillcolor="rgba(16, 185, 129, 0.15)",
-                        line=dict(color="#10b981", width=1.5, dash="dash")
-                    )
-                    fig_pareto.add_annotation(
-                        x=3.5, y=max_y * 0.98,
-                        text="🏆 Optimal Congestion Sweet Spot<br>(0% Voice Loss + Highest Throughput)",
-                        showarrow=False,
-                        font=dict(color="#34d399", size=10),
-                        bgcolor="rgba(15, 23, 42, 0.85)",
-                        bordercolor="#10b981"
-                    )
-                    y_range = [min_y, max_y]
-                    x_range = [-2, max_x]
-                    caption_text = "💡 *Under congestion, FIFO loses 97% of voice and WFQ loses 68% of voice. Only DQN protects 100% of Voice calls with maximum throughput!*"
-                    
-                elif "Tail Latency" in pareto_view:
-                    x_col = "P95 Tail Delay (ms)"
-                    y_col = "Total Delivery Rate (%)"
-                    x_label = "95th-Percentile Tail Delay (ms) ← (Lower is Better)"
-                    y_label = "Total Packet Delivery Rate (%) ↑ (Higher is Better)"
-                    min_y = max(0.0, df_pareto[y_col].min() * 0.75)
-                    max_y = min(103.0, max(df_pareto[y_col].max() * 1.18, 15.0))
-                    max_x = max(250.0, df_pareto[x_col].max() * 1.1)
-                    best_deliv = df_pareto[y_col].max()
-                    
-                    fig_pareto = px.scatter(
-                        df_pareto,
-                        x=x_col,
-                        y=y_col,
-                        text="DisplayLabel",
-                        size="Throughput (Mbps)",
-                        color="Scheduler",
-                        template="plotly_dark",
-                        color_discrete_map={"DQN": "#10b981", "PQ": "#f59e0b", "WFQ": "#6366f1", "FIFO": "#94a3b8"}
-                    )
-                    # Sweet spot: Tail delay < 220ms, Delivery Rate in top 10%
-                    fig_pareto.add_shape(
-                        type="rect",
-                        x0=0, y0=best_deliv * 0.88, x1=220, y1=max_y,
-                        fillcolor="rgba(16, 185, 129, 0.15)",
-                        line=dict(color="#10b981", width=1.5, dash="dash")
-                    )
-                    fig_pareto.add_annotation(
-                        x=110, y=max_y * 0.98,
-                        text="🏆 Ideal QoS Sweet Spot<br>(Low Tail Delay + High Delivery %)",
-                        showarrow=False,
-                        font=dict(color="#34d399", size=10),
-                        bgcolor="rgba(15, 23, 42, 0.85)",
-                        bordercolor="#10b981"
-                    )
-                    y_range = [min_y, max_y]
-                    x_range = [0, max_x]
-                    caption_text = "💡 *DQN achieves high delivery without catastrophic buffer bloat.*"
-                    
-                elif "Delivery-Ratio Fairness" in pareto_view:
-                    x_col = "Voice Delay (ms)"
-                    y_col = "Delivery Fairness"
-                    x_label = "Voice Average Delay (ms) ← (Lower is Better)"
-                    y_label = "Delivery Ratio Fairness Index ↑ (Higher is Better)"
-                    max_x = max(40.0, df_pareto[x_col].max() * 1.15)
-                    min_y = max(0.0, df_pareto[y_col].min() * 0.8)
-                    
-                    fig_pareto = px.scatter(
-                        df_pareto,
-                        x=x_col,
-                        y=y_col,
-                        text="DisplayLabel",
-                        size="Throughput (Mbps)",
-                        color="Scheduler",
-                        template="plotly_dark",
-                        color_discrete_map={"DQN": "#10b981", "PQ": "#f59e0b", "WFQ": "#6366f1", "FIFO": "#94a3b8"}
-                    )
-                    fig_pareto.add_shape(
-                        type="rect",
-                        x0=0, y0=0.70, x1=25, y1=1.02,
-                        fillcolor="rgba(16, 185, 129, 0.15)",
-                        line=dict(color="#10b981", width=1.5, dash="dash")
-                    )
-                    fig_pareto.add_annotation(
-                        x=12.5, y=0.98,
-                        text="🏆 Ideal QoS Sweet Spot<br>(Voice Delay < 25ms + High Fairness)",
-                        showarrow=False,
-                        font=dict(color="#34d399", size=10),
-                        bgcolor="rgba(15, 23, 42, 0.85)",
-                        bordercolor="#10b981"
-                    )
-                    y_range = [min_y, 1.03]
-                    x_range = [-2, max_x]
-                    caption_text = "💡 *DQN delivers both low Voice Delay AND high delivery fairness (~0.83).*"
-                    
-                else:
-                    x_col = "Voice Delay (ms)"
-                    y_col = "Throughput Fairness"
-                    x_label = "Voice Average Delay (ms) ← (Lower is Better)"
-                    y_label = "Throughput Fairness Index ↑"
-                    max_x = max(40.0, df_pareto[x_col].max() * 1.15)
-                    
-                    fig_pareto = px.scatter(
-                        df_pareto,
-                        x=x_col,
-                        y=y_col,
-                        text="DisplayLabel",
-                        size="Throughput (Mbps)",
-                        color="Scheduler",
-                        template="plotly_dark",
-                        color_discrete_map={"DQN": "#10b981", "PQ": "#f59e0b", "WFQ": "#6366f1", "FIFO": "#94a3b8"}
-                    )
-                    y_range = [0.35, 1.05]
-                    x_range = [-2, max_x]
-                    caption_text = "💡 *Raw Throughput Fairness naturally favors WFQ's static weights, but WFQ pays for it with massive 360ms tail buffer bloat.*"
-
+                fig_pareto = px.scatter(
+                    df_pareto,
+                    x="Voice Delay (ms)",
+                    y="Jain's Fairness Index",
+                    text="DisplayLabel",
+                    size="Throughput (Mbps)",
+                    color="Scheduler",
+                    template="plotly_dark",
+                    color_discrete_map={"DQN": "#10b981", "PQ": "#f59e0b", "WFQ": "#6366f1", "FIFO": "#94a3b8"}
+                )
+                
+                # Highlight the Pareto optimal sweet spot quadrant
+                max_x = max(50.0, df_pareto["Voice Delay (ms)"].max() * 1.15)
+                fig_pareto.add_shape(
+                    type="rect",
+                    x0=0, y0=0.48, x1=35, y1=1.02,
+                    fillcolor="rgba(16, 185, 129, 0.12)",
+                    line=dict(color="#10b981", width=1.5, dash="dash")
+                )
+                fig_pareto.add_annotation(
+                    x=17.5, y=0.98,
+                    text="🏆 Ideal QoS Sweet Spot<br>(Low Voice Delay + High Fairness)",
+                    showarrow=False,
+                    font=dict(color="#34d399", size=10),
+                    bgcolor="rgba(15, 23, 42, 0.85)",
+                    bordercolor="#10b981"
+                )
+                
                 pos_map = {
                     "DQN": "top right",
                     "PQ": "bottom left",
@@ -539,14 +413,14 @@ def main():
                     trace.marker.line = dict(width=2, color="#ffffff")
                 
                 fig_pareto.update_layout(
-                    height=345,
-                    margin=dict(l=20, r=20, t=10, b=20),
-                    xaxis=dict(title=x_label, range=x_range),
-                    yaxis=dict(title=y_label, range=y_range),
+                    height=380,
+                    margin=dict(l=20, r=20, t=25, b=20),
+                    xaxis=dict(title="Voice Average Delay (ms) ← (Lower is Better)", range=[-2, max_x]),
+                    yaxis=dict(title="Jain's Fairness Index ↑ (Higher is Better)", range=[0.35, 1.05]),
                     showlegend=False
                 )
                 st.plotly_chart(fig_pareto, use_container_width=True)
-                st.caption(caption_text)
+                st.caption("💡 *PQ is trapped below 0.45 fairness due to starvation. FIFO & WFQ suffer high voice latency. Only DQN achieves both low voice latency and high fairness!*")
 
             # -------------------------------------------------------------
             # ROW 2: CLASSICAL SULKER FLAWS EXPOSED (TAIL DELAY & STARVATION)

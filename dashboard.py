@@ -620,48 +620,61 @@ def main():
         with c1:
             st.markdown(r"""
             #### A. State Vector Observation $S_t \in \mathbb{R}^{13}$
-            The AI agent observes a **13-dimensional normalized numerical vector** at each step:
+            The AI agent observes a **13-dimensional normalized numerical vector** at each decision step:
             1. **`len(voice_queue) / max_cap`** — Current occupancy ratio of Voice Queue.
             2. **`len(video_queue) / max_cap`** — Current occupancy ratio of Video Queue.
             3. **`len(bulk_queue) / max_cap`** — Current occupancy ratio of Bulk Queue.
-            4. **`wait_time_voice / 30ms`** — Waiting time of oldest Voice packet.
-            5. **`wait_time_video / 100ms`** — Waiting time of oldest Video packet.
-            6. **`wait_time_bulk / 500ms`** — Waiting time of oldest Bulk Data packet.
-            7. **`avg_delay_voice / 50ms`** — Moving average Voice delay.
-            8. **`avg_delay_video / 150ms`** — Moving average Video delay.
-            9. **`avg_delay_bulk / 500ms`** — Moving average Bulk Data delay.
-            10. **`link_utilization`** — Binary indicator (1 if link busy, 0 if free).
-            11-13. **`near_deadline_ratios`** — Fraction of packets in each queue consuming >75% of max allowed latency.
+            4. **`wait_time_voice / 30ms`** — Waiting time of oldest Voice packet (Voice SLA).
+            5. **`wait_time_video / 100ms`** — Waiting time of oldest Video packet (Video SLA).
+            6. **`wait_time_bulk / 500ms`** — Waiting time of oldest Bulk packet (Bulk SLA).
+            7. **`avg_delay_voice / 50ms`** — Rolling average Voice delay (last 10 packets).
+            8. **`avg_delay_video / 150ms`** — Rolling average Video delay (last 10 packets).
+            9. **`avg_delay_bulk / 500ms`** — Rolling average Bulk delay (last 10 packets).
+            10. **`link_busy`** — Binary indicator ($1.0$ if link busy transmitting, $0.0$ if idle).
+            11. **`near_deadline_voice`** — Ratio of Voice packets within $20\%$ of drop deadline.
+            12. **`near_deadline_video`** — Ratio of Video packets within $20\%$ of drop deadline.
+            13. **`near_deadline_bulk`** — Ratio of Bulk packets within $20\%$ of drop deadline.
+            
+            *(All observation values are clipped to $[0.0, 10.0]$ for PyTorch numerical stability).*
             """)
             
             st.markdown(r"""
-            #### B. Discrete Action Space $A_t \in \{0, 1, 2\}$
+            #### B. Discrete Action Space $A_t \in \{0, 1, 2\}$ with Action Masking
             - **Action 0**: Serve Voice Queue (Queue 0 - High Priority)
             - **Action 1**: Serve Video Queue (Queue 1 - Medium Priority)
             - **Action 2**: Serve Bulk Data Queue (Queue 2 - Low Priority Best-Effort)
-            *If a selected queue is empty, the simulator falls back to the highest priority non-empty queue and applies an explicit invalid action penalty.*
+            
+            > **⚡ Action Masking Engine:** The agent extracts an action mask $M_t = [\text{len}(Q_0)>0, \text{len}(Q_1)>0, \text{len}(Q_2)>0]$. Empty queues are forcefully masked with $Q = -10^9$ during both training exploration and inference, guaranteeing **zero wasted transmission cycles** on empty queues.
             """)
 
         with c2:
             st.markdown(r"""
             #### C. Multi-Objective Reward Function
             The agent is rewarded for successful transmissions while maintaining QoS requirements:
-            $$R_t = \alpha S_t - \beta D_t - \gamma L_t - \delta J_t - \lambda U_t$$
+            $$R_t = R_{\text{delivery}} + R_{\text{SLA}} - P_{\text{violation}} - P_{\text{loss}} - P_{\text{jitter}} - P_{\text{starv}} - P_{\text{pressure}} + B_{\text{interleave}}$$
 
             Where:
-            - **$S_t$ (Service Delivered)**: Proportional to transmitted bytes and priority weight ($1.2\times$ Voice, $0.8\times$ Video, $0.4\times$ Bulk).
-            - **$D_t$ (Delay Penalty)**: Non-linear penalty $(\text{delay}/\text{deadline})^{1.5}$ for packets approaching deadline.
-            - **$L_t$ (Packet Loss Penalty)**: Penalty incurred per dropped packet due to overflow or deadline expiration.
-            - **$\delta J_t$ (Jitter Penalty)**: Penalty for variance in consecutive Voice delays.
-            - **$\lambda U_t$ (Starvation Penalty)**: Applied if Video/Bulk queues wait without service past threshold.
+            - **$R_{\text{delivery}}$ (Payload Delivery)**: Base reward proportional to bytes transmitted: $+(\text{size\_bytes} / 1000)$.
+            - **$R_{\text{SLA}}$ (SLA Bonus)**: $+1.0$ bonus when packet arrives under deadline target (Voice $<25\text{ms}$, Video $<80\text{ms}$, Bulk $<350\text{ms}$).
+            - **$P_{\text{violation}}$ (Delay Violation Penalty)**: Progressive penalty $1.5 \times (\text{excess\_ratio})^{1.3}$ if delay exceeded.
+            - **$P_{\text{loss}}$ (Packet Drop Penalty)**: Heavy penalty $-2.5 \times \text{drops}$ for any overflow or deadline drops.
+            - **$P_{\text{jitter}}$ (Voice Jitter Penalty)**: Variance of recent voice delays to eliminate voice stutter.
+            - **$P_{\text{starv}}$ (Starvation Defense)**: Non-linear penalty if Bulk ($>40\text{ms}$) or Video ($>40\text{ms}$) wait too long without service.
+            - **$P_{\text{pressure}}$ (Buffer Pressure Penalty)**: Applied when any queue exceeds $45\%$ capacity to drain buffers *before* drops occur.
+            - **$B_{\text{interleave}}$ (Cooperative Bonus)**: Reward for servicing Bulk/Video *when Voice wait time is safe ($<5\text{ms}$)*.
             """)
             
             st.markdown(r"""
-            #### D. Deep Q-Learning Optimization
-            - Neural Network: `13 -> Dense(128) -> ReLU -> Dense(128) -> ReLU -> 3 Q-Values`
-            - Experience Replay Memory: 50,000 transitions.
-            - $\epsilon$-Greedy exploration decaying from $1.0 \to 0.05$.
-            - Bellman Loss minimization using Huber Loss & Adam optimizer.
+            #### D. Double Dueling DQN Optimization
+            - **Dueling Architecture**: Decouples State-Value $V(s)$ from Action-Advantage $A(s, a)$:
+              $$Q(s, a) = V(s) + \left(A(s, a) - \frac{1}{|A|}\sum_{a'} A(s, a')\right)$$
+              Shared Extractor: `Linear(13, 128) -> ReLU -> Linear(128, 128) -> ReLU`  
+              Value Stream: `Linear(128, 64) -> ReLU -> Linear(64, 1)`  
+              Advantage Stream: `Linear(128, 64) -> ReLU -> Linear(64, 3)`
+            - **Double DQN (DDQN)**: Policy net selects $a^* = \arg\max Q(s', a; \theta)$, Target net evaluates $Q(s', a^*; \theta^-)$ to eliminate Q-overestimation bias.
+            - **Polyak Soft Target Updates**: Continuous smooth tracking ($\theta^- \leftarrow 0.005\theta + 0.995\theta^-$).
+            - **Replay Memory**: 50,000 transitions, mini-batch size 64, Smooth L1 (Huber) Loss, Adam optimizer ($\text{lr} = 0.0005$, gradient clipping $1.0$).
+            - **$\epsilon$-Greedy Policy**: Decaying from $1.0 \to 0.05$ (decay rate $0.965$).
             """)
 
         st.markdown("---")
